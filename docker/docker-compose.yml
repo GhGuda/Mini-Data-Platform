@@ -1,0 +1,113 @@
+networks:
+  mini-data-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:
+  airflow_logs:
+  metabase_data:
+  shared_logs:
+
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: mini_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../logs:/logs
+    ports:
+      - "5432:5432"
+    networks:
+      - mini-data-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: mini-minio
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+      - ../logs:/logs
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - mini-data-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    container_name: mini-airflow-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    volumes:
+      - ../pipelines/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ../logs:/logs
+    command: webserver
+    ports:
+      - "8080:8080"
+    networks:
+      - mini-data-network
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    container_name: mini-airflow-scheduler
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    volumes:
+      - ../pipelines/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ../logs:/logs
+    command: scheduler
+    networks:
+      - mini-data-network
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: mini-metabase
+    restart: unless-stopped
+    volumes:
+      - metabase_data:/metabase-data
+      - ../logs:/logs
+    ports:
+      - "3000:3000"
+    networks:
+      - mini-data-network
