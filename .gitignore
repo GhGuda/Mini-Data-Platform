@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+env/
+
+# Logs
+logs/
+*.log
+
+# Docker
+*.env
+docker/data/
+docker/volumes/
+
+# Airflow
+airflow.db
+airflow-webserver.pid
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

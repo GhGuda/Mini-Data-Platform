@@ -1,0 +1,1 @@
+Sales CSV → MinIO → Airflow → PostgreSQL → Metabase
