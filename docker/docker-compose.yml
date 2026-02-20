@@ -73,7 +73,10 @@ services:
       - ../pipelines/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
       - ../logs:/logs
-    command: webserver
+      - ./configs/airflow-init.sh:/airflow-init.sh
+
+    entrypoint: ["/bin/bash", "/airflow-init.sh"]
+    command: ["webserver"]
     ports:
       - "8080:8080"
     networks:
@@ -96,7 +99,10 @@ services:
       - ../pipelines/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
       - ../logs:/logs
-    command: scheduler
+      - ./configs/airflow-init.sh:/airflow-init.sh
+
+    entrypoint: ["/bin/bash", "/airflow-init.sh"]
+    command: ["scheduler"]
     networks:
       - mini-data-network
 
