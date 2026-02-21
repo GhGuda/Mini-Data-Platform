@@ -124,6 +124,18 @@ services:
     networks:
       - mini-data-network
 
+  data-generator:
+    build: ../services/data_generator
+    container_name: mini-data-generator
+    env_file:
+      - .env
+    volumes:
+      - ../logs:/logs
+      - ../storage/sample_data:/data/raw
+    networks:
+      - mini-data-network
+    restart: "no"
+
 
   metabase:
     image: metabase/metabase:latest
