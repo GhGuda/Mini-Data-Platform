@@ -51,10 +51,27 @@ services:
     networks:
       - mini-data-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+
+  storage-init:
+    build: ../services/storage_init
+    container_name: mini-storage-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      MINIO_ENDPOINT: minio:9000
+    volumes:
+      - ../logs:/logs
+    networks:
+      - mini-data-network
+    restart: "no"
 
   airflow-webserver:
     image: apache/airflow:2.8.1
@@ -94,7 +111,7 @@ services:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_AIRFLOW_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     volumes:
       - ../pipelines/dags:/opt/airflow/dags
@@ -106,6 +123,7 @@ services:
     command: ["scheduler"]
     networks:
       - mini-data-network
+
 
   metabase:
     image: metabase/metabase:latest
