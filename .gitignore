@@ -28,3 +28,7 @@ airflow-webserver.pid
 # OS
 .DS_Store
 Thumbs.db
+
+.env
+*.db
+*.sqlite3
