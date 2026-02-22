@@ -1,0 +1,46 @@
+name: Mini Data Platform CI
+
+on:
+  push:
+    branches:
+      - debug
+      - master
+  pull_request:
+    branches:
+      - working_from_home
+      - master
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate docker-compose file
+        run: |
+          docker compose -f docker/docker-compose.yml config
+
+      - name: Build Docker images
+        run: |
+          docker compose -f docker/docker-compose.yml build --no-cache
+
+      - name: Start services
+        run: |
+          docker compose -f docker/docker-compose.yml up -d
+
+      - name: Wait for services
+        run: sleep 30
+
+      - name: Validate Airflow DAG import
+        run: |
+          docker exec mini-airflow-web airflow dags list
+
+      - name: Tear down containers
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yml down -v
