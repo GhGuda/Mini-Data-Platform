@@ -3,7 +3,7 @@ name: Mini Data Platform CI
 on:
   push:
     branches:
-      - debug
+      - working_from_home
       - master
   pull_request:
     branches:
