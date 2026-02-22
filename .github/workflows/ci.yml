@@ -47,10 +47,52 @@ jobs:
         run: |
           docker exec mini-airflow-web airflow db init
 
+      - name: Upload test CSV to MinIO
+        run: |
+          docker exec mini-minio mc alias set local http://localhost:9000 ${{ secrets.POSTGRES_USER }} ${{ secrets.POSTGRES_PASSWORD }}
+        
+      - name: Create test CSV inside Airflow container
+        run: |
+          docker exec mini-airflow-web bash -c "
+          cat <<EOF > /tmp/test_sales.csv
+            order_code,customer_code,customer_name,email,country,product_code,quantity,unit_price,total_price
+            ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
+            EOF
+            "
+
+      - name: Upload test CSV to sales-raw bucket
+        run: |
+          docker exec mini-airflow-web python - <<EOF
+            from minio import Minio
+            client = Minio("mini-minio:9000",
+                access_key="${{ secrets.POSTGRES_USER }}",
+                secret_key="${{ secrets.POSTGRES_PASSWORD }}",
+                secure=False
+            )
+            client.fput_object("sales-raw", "ci_test.csv", "/tmp/test_sales.csv")
+            print("Upload successful")
+            EOF
+
+      - name: Trigger ETL DAG
+        run: |
+          docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
+
+      - name: Wait for DAG execution
+        run: sleep 60
+
       - name: Validate Airflow DAG import
         run: |
           docker exec mini-airflow-web airflow dags list
-          
+
+      - name: Validate data inserted into Postgres
+        run: |
+          docker exec mini_postgres psql -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }} -c "SELECT COUNT(*) FROM fact_sales;" > result.txt
+          cat result.txt
+          if ! grep -q "1" result.txt; then
+            echo "Data validation failed"
+            exit 1
+          fi
+
       - name: Tear down containers
         if: always()
         run: |
