@@ -43,10 +43,14 @@ jobs:
       - name: Wait for services
         run: sleep 30
 
+      - name: Initialize Airflow DB
+        run: |
+          docker exec mini-airflow-web airflow db init
+
       - name: Validate Airflow DAG import
         run: |
           docker exec mini-airflow-web airflow dags list
-
+          
       - name: Tear down containers
         if: always()
         run: |
