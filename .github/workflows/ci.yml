@@ -26,8 +26,12 @@ jobs:
       MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Create .env for Docker
         run: |
+          mkdir -p docker
           cat <<EOF > docker/.env
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -40,15 +44,12 @@ jobs:
           MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
           EOF
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
       - name: Build Docker Images
         run: |
           docker compose -f docker/docker-compose.yml build
 
       # ------------------------------------------------------------
-      # 1️⃣ Start Infrastructure (Postgres + MinIO only)
+      # Start Infrastructure (Postgres + MinIO only)
       # ------------------------------------------------------------
       - name: Start Core Infrastructure
         run: |
@@ -68,14 +69,14 @@ jobs:
           exit 1
 
       # ------------------------------------------------------------
-      # 2️⃣ Initialize Airflow Metadata
+      # Initialize Airflow Metadata
       # ------------------------------------------------------------
       - name: Initialize Airflow Metadata DB
         run: |
           docker compose -f docker/docker-compose.yml run --rm airflow-webserver airflow db init
 
       # ------------------------------------------------------------
-      # 3️⃣ Start Airflow Services
+      # Start Airflow Services
       # ------------------------------------------------------------
       - name: Start Airflow Services
         run: |
@@ -85,7 +86,7 @@ jobs:
         run: sleep 30
 
       # ------------------------------------------------------------
-      # 4️⃣ Ensure DAG Registered in Metadata
+      # Ensure DAG Registered in Metadata
       # ------------------------------------------------------------
       - name: Wait for DAG metadata registration
         run: |
@@ -102,7 +103,7 @@ jobs:
           exit 1
 
       # ------------------------------------------------------------
-      # 5️⃣ Create Test CSV
+      # Create Test CSV
       # ------------------------------------------------------------
       - name: Create test CSV inside Airflow container
         run: |
@@ -112,7 +113,7 @@ jobs:
           EOF'
 
       # ------------------------------------------------------------
-      # 6️⃣ Ensure MinIO Bucket Exists
+      # Ensure MinIO Bucket Exists
       # ------------------------------------------------------------
       - name: Ensure sales-raw bucket exists
         run: |
@@ -144,7 +145,7 @@ jobs:
           "
 
       # ------------------------------------------------------------
-      # 7️⃣ Trigger DAG
+      # Trigger DAG
       # ------------------------------------------------------------
       - name: Trigger ETL DAG
         run: |
@@ -154,7 +155,7 @@ jobs:
         run: sleep 60
 
       # ------------------------------------------------------------
-      # 8️⃣ Validate Data Flow
+      # Validate Data Flow
       # ------------------------------------------------------------
       - name: Validate Data in sales_db
         run: |
@@ -167,7 +168,7 @@ jobs:
           fi
 
       # ------------------------------------------------------------
-      # 9️⃣ Cleanup
+      # Cleanup
       # ------------------------------------------------------------
       - name: Shutdown Containers
         if: always()
