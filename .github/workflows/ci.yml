@@ -97,6 +97,22 @@ jobs:
           ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
           EOF'
 
+      - name: Create sales-raw bucket
+        run: |
+          docker exec mini-airflow-web python -c "
+          from minio import Minio
+          client = Minio(
+              'mini-minio:9000',
+              access_key='${{ secrets.MINIO_ROOT_USER }}',
+              secret_key='${{ secrets.MINIO_ROOT_PASSWORD }}',
+              secure=False
+          )
+          if not client.bucket_exists('sales-raw'):
+              client.make_bucket('sales-raw')
+          print('Bucket ready')
+          "
+
+      
       - name: Upload test CSV to sales-raw bucket
         run: |
           docker exec mini-airflow-web python -c "
