@@ -17,8 +17,8 @@ jobs:
     env:
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-      POSTGRES_AIRFLOW_DB: ${{ secrets.POSTGRES_AIRFLOW_DB }}
+      POSTGRES_DB: sales_db
+      POSTGRES_AIRFLOW_DB: airflow_db
       AIRFLOW_EXECUTOR: ${{ secrets.AIRFLOW_EXECUTOR }}
       AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
       AIRFLOW_WEBSERVER_SECRET_KEY: ${{ secrets.AIRFLOW_WEBSERVER_SECRET_KEY }}
@@ -28,6 +28,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Reset Docker Compose State
+        run: |
+          docker compose -f docker/docker-compose.yml down -v --remove-orphans || true
 
       - name: Create .env for Docker
         run: |
@@ -161,10 +165,20 @@ jobs:
       # ------------------------------------------------------------
       - name: Validate Data in sales_db
         run: |
-          COUNT=$(docker exec mini_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c \
+          DB_EXISTS=$(docker exec mini_postgres psql -U "$POSTGRES_USER" -d postgres -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}';")
+          if [ "$DB_EXISTS" != "1" ]; then
+            echo "Target database '${POSTGRES_DB}' does not exist."
+            echo "Available databases:"
+            docker exec mini_postgres psql -U "$POSTGRES_USER" -d postgres -tAc \
+              "SELECT datname FROM pg_database ORDER BY datname;"
+            exit 1
+          fi
+
+          COUNT=$(docker exec mini_postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
             "SELECT COUNT(*) FROM fact_sales;")
           echo "fact_sales count: $COUNT"
-          if [ "$COUNT" -lt 1 ]; then
+          if [ "${COUNT:-0}" -lt 1 ]; then
             echo "ETL failed: No rows in fact_sales"
             exit 1
           fi
