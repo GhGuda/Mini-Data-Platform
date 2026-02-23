@@ -27,52 +27,83 @@ class SalesTransformer:
 
     def transform(self, df: pd.DataFrame) -> dict:
         """
-        Normalize raw DataFrame into separate DataFrames
-        for customers, products, orders, order_items, and fact_sales.
+        Normalize raw DataFrame into dimension tables and order line items.
         """
 
         self.logger.info("Starting transformation process.")
 
-        # Drop duplicates for dimension tables
+        required_columns = {
+            "order_code",
+            "customer_code",
+            "customer_name",
+            "email",
+            "country",
+            "product_code",
+            "product_name",
+            "category",
+            "quantity",
+            "unit_price",
+            "order_date",
+        }
+
+        missing_columns = sorted(required_columns.difference(df.columns))
+        if missing_columns:
+            raise ValueError(
+                f"Missing required column(s): {', '.join(missing_columns)}"
+            )
+
+        working_df = df.copy()
+        working_df["quantity"] = pd.to_numeric(
+            working_df["quantity"],
+            errors="raise",
+        )
+        working_df["unit_price"] = pd.to_numeric(
+            working_df["unit_price"],
+            errors="raise",
+        )
+        working_df["order_date"] = pd.to_datetime(
+            working_df["order_date"],
+            errors="raise",
+        ).dt.date
+
         customers = (
-            df[["customer_code", "customer_name", "email", "country"]]
+            working_df[["customer_code", "customer_name", "email", "country"]]
+            .rename(columns={"customer_name": "full_name"})
             .drop_duplicates()
             .reset_index(drop=True)
         )
 
         products = (
-            df[["product_code", "product_name", "category"]]
-            .drop_duplicates()
+            working_df[["product_code", "product_name", "category", "unit_price"]]
+            .rename(columns={"unit_price": "price"})
+            .drop_duplicates(subset=["product_code"], keep="last")
             .reset_index(drop=True)
         )
 
-        orders = (
-            df[["order_code", "customer_code", "order_date"]]
-            .drop_duplicates()
-            .reset_index(drop=True)
-        )
-
-        order_items = df[
-            [
-                "order_code",
-                "product_code",
-                "quantity",
-                "unit_price",
+        order_lines = (
+            working_df[
+                [
+                    "order_code",
+                    "customer_code",
+                    "order_date",
+                    "country",
+                    "product_code",
+                    "category",
+                    "quantity",
+                    "unit_price",
+                ]
             ]
-        ].copy()
-
-        order_items["total_price"] = (
-            order_items["quantity"] * order_items["unit_price"]
+            .reset_index(drop=True)
         )
 
-        fact_sales = order_items.copy()
+        order_lines["line_total"] = (
+            order_lines["quantity"] * order_lines["unit_price"]
+        )
 
         self.logger.info("Transformation completed successfully.")
 
         return {
             "customers": customers,
             "products": products,
-            "orders": orders,
-            "order_items": order_items,
-            "fact_sales": fact_sales,
+            "order_lines": order_lines,
         }

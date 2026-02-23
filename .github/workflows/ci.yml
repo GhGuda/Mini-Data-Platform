@@ -17,17 +17,27 @@ jobs:
     env:
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      POSTGRES_DB: sales_db
-      POSTGRES_AIRFLOW_DB: airflow_db
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_AIRFLOW_DB: ${{ secrets.POSTGRES_AIRFLOW_DB }}
       AIRFLOW_EXECUTOR: ${{ secrets.AIRFLOW_EXECUTOR }}
       AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
       AIRFLOW_WEBSERVER_SECRET_KEY: ${{ secrets.AIRFLOW_WEBSERVER_SECRET_KEY }}
       MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
       MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+      MINIO_BUCKET_RAW: ${{ secrets.MINIO_BUCKET_RAW }}
+      MINIO_BUCKET_PROCESSED: ${{ secrets.MINIO_BUCKET_PROCESSED }}
+      MINIO_ENDPOINT: minio:9000
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Apply CI defaults
+        run: |
+          echo "POSTGRES_DB=${POSTGRES_DB:-sales_db}" >> "$GITHUB_ENV"
+          echo "POSTGRES_AIRFLOW_DB=${POSTGRES_AIRFLOW_DB:-airflow_db}" >> "$GITHUB_ENV"
+          echo "MINIO_BUCKET_RAW=${MINIO_BUCKET_RAW:-sales-raw}" >> "$GITHUB_ENV"
+          echo "MINIO_BUCKET_PROCESSED=${MINIO_BUCKET_PROCESSED:-sales-processed}" >> "$GITHUB_ENV"
 
       - name: Reset Docker Compose State
         run: |
@@ -48,6 +58,9 @@ jobs:
           AIRFLOW_WEBSERVER_SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY}
           MINIO_ROOT_USER=${MINIO_ROOT_USER}
           MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+          MINIO_BUCKET_RAW=${MINIO_BUCKET_RAW}
+          MINIO_BUCKET_PROCESSED=${MINIO_BUCKET_PROCESSED}
+          MINIO_ENDPOINT=${MINIO_ENDPOINT}
           EOF
 
       - name: Build Docker Images
@@ -119,14 +132,14 @@ jobs:
       - name: Create test CSV inside Airflow container
         run: |
           docker exec mini-airflow-web bash -c 'cat <<EOF > /tmp/test_sales.csv
-          order_code,customer_code,customer_name,email,country,product_code,quantity,unit_price,total_price
-          ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
+          order_code,customer_code,customer_name,email,country,product_code,product_name,category,quantity,unit_price,order_date
+          ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,Widget A,Electronics,2,50,2026-02-20
           EOF'
 
       # ------------------------------------------------------------
       # Ensure MinIO Bucket Exists
       # ------------------------------------------------------------
-      - name: Ensure sales-raw bucket exists
+      - name: Ensure required MinIO buckets exist
         run: |
           docker exec mini-airflow-web python -c "
           from minio import Minio
@@ -136,9 +149,10 @@ jobs:
               secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
           )
-          if not client.bucket_exists('sales-raw'):
-              client.make_bucket('sales-raw')
-          print('Bucket ready')
+          for bucket in ('${MINIO_BUCKET_RAW}', '${MINIO_BUCKET_PROCESSED}'):
+              if not client.bucket_exists(bucket):
+                  client.make_bucket(bucket)
+          print('Buckets ready')
           "
 
       - name: Upload test CSV to MinIO
@@ -151,7 +165,7 @@ jobs:
               secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
           )
-          client.fput_object('sales-raw', 'ci_test.csv', '/tmp/test_sales.csv')
+          client.fput_object('${MINIO_BUCKET_RAW}', 'ci_test.csv', '/tmp/test_sales.csv')
           print('Upload successful')
           "
 
@@ -180,13 +194,18 @@ jobs:
             exit 1
           fi
 
-          COUNT=$(docker exec mini_postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
-            "SELECT COUNT(*) FROM fact_sales;")
-          echo "fact_sales count: $COUNT"
-          if [ "${COUNT:-0}" -lt 1 ]; then
-            echo "ETL failed: No rows in fact_sales"
-            exit 1
-          fi
+          for i in {1..24}; do
+            COUNT=$(docker exec mini_postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
+              "SELECT COUNT(*) FROM fact_sales;")
+            echo "fact_sales count (attempt ${i}): $COUNT"
+            if [ "${COUNT:-0}" -ge 1 ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "ETL failed: No rows in fact_sales after waiting."
+          exit 1
 
       # ------------------------------------------------------------
       # Cleanup

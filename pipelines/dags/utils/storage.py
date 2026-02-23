@@ -58,6 +58,13 @@ class MinIOStorage:
         """
         try:
             client = self.connect()
+            if not self.raw_bucket:
+                raise ValueError("MINIO_BUCKET_RAW is not configured.")
+            if not client.bucket_exists(self.raw_bucket):
+                self.logger.warning(
+                    f"Raw bucket does not exist yet: {self.raw_bucket}"
+                )
+                return []
 
             objects = client.list_objects(self.raw_bucket, recursive=True)
 
@@ -116,6 +123,12 @@ class MinIOStorage:
 
         try:
             client = self.connect()
+            if not self.raw_bucket:
+                raise ValueError("MINIO_BUCKET_RAW is not configured.")
+            if not self.processed_bucket:
+                raise ValueError("MINIO_BUCKET_PROCESSED is not configured.")
+            if not client.bucket_exists(self.processed_bucket):
+                client.make_bucket(self.processed_bucket)
 
             self.logger.info(f"Moving file to processed bucket: {object_name}")
 
