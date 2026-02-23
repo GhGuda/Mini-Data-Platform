@@ -59,12 +59,10 @@ jobs:
 
       - name: Create test CSV inside Airflow container
         run: |
-          docker exec mini-airflow-web bash -c "
-          cat <<EOF > /tmp/test_sales.csv
-            order_code,customer_code,customer_name,email,country,product_code,quantity,unit_price,total_price
-            ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
-            EOF
-            "
+          docker exec mini-airflow-web bash -c 'cat <<EOF > /tmp/test_sales.csv
+          order_code,customer_code,customer_name,email,country,product_code,quantity,unit_price,total_price
+          ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
+          EOF'
 
       - name: Upload test CSV to sales-raw bucket
         run: |
@@ -80,12 +78,28 @@ jobs:
             print("Upload successful")
             EOF
 
+      - name: Wait for Scheduler process
+        run: |
+          sleep 20
+
+      - name: Wait for DAG registration
+        run: |
+          for i in {1..20}; do
+            if docker exec mini-airflow-web airflow dags list | grep -q "sales_etl_pipeline"; then
+              echo "DAG registered"
+              break
+            fi
+            echo "Waiting for DAG registration..."
+            sleep 5
+          done
+
       - name: Trigger ETL DAG
         run: |
           docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
 
       - name: Wait for DAG execution
-        run: sleep 60
+        run: |
+          sleep 60
 
       - name: Validate Airflow DAG import
         run: |
