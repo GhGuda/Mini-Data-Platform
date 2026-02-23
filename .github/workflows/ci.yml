@@ -62,6 +62,14 @@ jobs:
         run: |
           docker restart mini-airflow-scheduler
           sleep 20
+
+      - name: Show DAG import errors
+        run: |
+          docker exec mini-airflow-web airflow dags list-import-errors
+
+      - name: Verify dependencies inside Airflow
+        run: |
+          docker exec mini-airflow-web python -c "import minio, psycopg2, pandas; print('deps ok')"
       
       - name: Wait for Scheduler process
         run: |
