@@ -75,7 +75,7 @@ jobs:
       # ------------------------------------------------------------
       - name: Initialize Airflow Metadata DB
         run: |
-          docker compose -f docker/docker-compose.yml run --rm airflow-webserver airflow db init
+          docker compose -f docker/docker-compose.yml run --rm airflow-webserver db init
 
       # ------------------------------------------------------------
       # Start Airflow Services
@@ -151,7 +151,7 @@ jobs:
       # ------------------------------------------------------------
       - name: Trigger ETL DAG
         run: |
-          docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
+          docker exec mini-airflow-web dags trigger sales_etl_pipeline
 
       - name: Wait for DAG Execution
         run: sleep 60
