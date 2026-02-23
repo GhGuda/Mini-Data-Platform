@@ -26,6 +26,20 @@ jobs:
       MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
 
     steps:
+      - name: Create .env for Docker
+        run: |
+          cat <<EOF > docker/.env
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_AIRFLOW_DB=${POSTGRES_AIRFLOW_DB}
+          AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+          AIRFLOW_FERNET_KEY=${AIRFLOW_FERNET_KEY}
+          AIRFLOW_WEBSERVER_SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY}
+          MINIO_ROOT_USER=${MINIO_ROOT_USER}
+          MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+          EOF
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -38,7 +52,7 @@ jobs:
       # ------------------------------------------------------------
       - name: Start Core Infrastructure
         run: |
-          docker compose -f docker/docker-compose.yml up -d mini_postgres mini-minio
+          docker compose -f docker/docker-compose.yml up -d postgres minio
 
       - name: Wait for Postgres
         run: |
