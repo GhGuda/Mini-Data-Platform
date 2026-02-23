@@ -151,7 +151,7 @@ jobs:
       # ------------------------------------------------------------
       - name: Trigger ETL DAG
         run: |
-          docker exec mini-airflow-web dags trigger sales_etl_pipeline
+          docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
 
       - name: Wait for DAG Execution
         run: sleep 60
