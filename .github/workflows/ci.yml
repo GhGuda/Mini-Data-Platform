@@ -57,6 +57,31 @@ jobs:
         run: |
           docker exec mini-airflow-web airflow db init
 
+      
+      - name: Restart Airflow Scheduler
+        run: |
+          docker restart mini-airflow-scheduler
+          sleep 20
+      
+      - name: Wait for Scheduler process
+        run: |
+          sleep 20
+      
+      - name: Debug DAG folder contents
+        run: |
+          docker exec mini-airflow-web ls -la /opt/airflow/dags
+
+      - name: Wait for DAG registration
+        run: |
+          for i in {1..20}; do
+            if docker exec mini-airflow-web airflow dags list | grep -q "sales_etl_pipeline"; then
+              echo "DAG registered"
+              break
+            fi
+            echo "Waiting for DAG registration..."
+            sleep 5
+          done
+
       - name: Create test CSV inside Airflow container
         run: |
           docker exec mini-airflow-web bash -c 'cat <<EOF > /tmp/test_sales.csv
@@ -78,21 +103,6 @@ jobs:
             print("Upload successful")
             EOF
 
-      - name: Wait for Scheduler process
-        run: |
-          sleep 20
-
-      - name: Wait for DAG registration
-        run: |
-          for i in {1..20}; do
-            if docker exec mini-airflow-web airflow dags list | grep -q "sales_etl_pipeline"; then
-              echo "DAG registered"
-              break
-            fi
-            echo "Waiting for DAG registration..."
-            sleep 5
-          done
-
       - name: Trigger ETL DAG
         run: |
           docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
@@ -104,7 +114,6 @@ jobs:
       - name: Validate Airflow DAG import
         run: |
           docker exec mini-airflow-web airflow dags list
-
     
       - name: Wait for MinIO to be healthy
         run: |
