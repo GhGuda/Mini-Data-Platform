@@ -87,7 +87,7 @@ with DAG(
             logger.info(
                 f"Customers: {len(normalized_data['customers'])}, "
                 f"Products: {len(normalized_data['products'])}, "
-                f"Orders: {len(normalized_data['orders'])}"
+                f"Order lines: {len(normalized_data['order_lines'])}"
             )
 
     def finalize(**context):

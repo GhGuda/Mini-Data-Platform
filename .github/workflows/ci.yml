@@ -36,6 +36,7 @@ jobs:
         run: |
           echo "POSTGRES_DB=${POSTGRES_DB:-sales_db}" >> "$GITHUB_ENV"
           echo "POSTGRES_AIRFLOW_DB=${POSTGRES_AIRFLOW_DB:-airflow_db}" >> "$GITHUB_ENV"
+          echo "AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR:-LocalExecutor}" >> "$GITHUB_ENV"
           echo "MINIO_BUCKET_RAW=${MINIO_BUCKET_RAW:-sales-raw}" >> "$GITHUB_ENV"
           echo "MINIO_BUCKET_PROCESSED=${MINIO_BUCKET_PROCESSED:-sales-processed}" >> "$GITHUB_ENV"
 
@@ -50,7 +51,7 @@ jobs:
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}
-          POSTGRES_HOST=mini_postgres
+          POSTGRES_HOST=postgres
           POSTGRES_PORT=5432
           POSTGRES_AIRFLOW_DB=${POSTGRES_AIRFLOW_DB}
           AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
@@ -144,7 +145,7 @@ jobs:
           docker exec mini-airflow-web python -c "
           from minio import Minio
           client = Minio(
-              'mini-minio:9000',
+              '${MINIO_ENDPOINT}',
               access_key='${MINIO_ROOT_USER}',
               secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
@@ -160,7 +161,7 @@ jobs:
           docker exec mini-airflow-web python -c "
           from minio import Minio
           client = Minio(
-              'mini-minio:9000',
+              '${MINIO_ENDPOINT}',
               access_key='${MINIO_ROOT_USER}',
               secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
@@ -172,12 +173,10 @@ jobs:
       # ------------------------------------------------------------
       # Trigger DAG
       # ------------------------------------------------------------
-      - name: Trigger ETL DAG
+      - name: Run ETL DAG synchronously
         run: |
-          docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
-
-      - name: Wait for DAG Execution
-        run: sleep 60
+          docker exec mini-airflow-web airflow dags unpause sales_etl_pipeline
+          docker exec mini-airflow-web airflow dags test sales_etl_pipeline 2026-02-23
 
       # ------------------------------------------------------------
       # Validate Data Flow
