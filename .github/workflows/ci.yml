@@ -40,8 +40,16 @@ jobs:
         run: |
           docker compose -f docker/docker-compose.yml up -d
 
-      - name: Wait for services
-        run: sleep 30
+      - name: Wait for Postgres to be healthy
+        run: |
+          for i in {1..20}; do
+            if docker exec mini_postgres pg_isready -U ${{ secrets.POSTGRES_USER }}; then
+              echo "Postgres is ready"
+              break
+            fi
+            echo "Waiting for Postgres..."
+            sleep 5
+          done
 
       - name: Initialize Airflow DB
         run: |
@@ -83,6 +91,18 @@ jobs:
       - name: Validate Airflow DAG import
         run: |
           docker exec mini-airflow-web airflow dags list
+
+    
+      - name: Wait for MinIO to be healthy
+        run: |
+          for i in {1..20}; do
+            if docker exec mini-minio curl -f http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready"
+              break
+            fi
+            echo "Waiting for MinIO..."
+            sleep 5
+          done
 
       - name: Validate data inserted into Postgres
         run: |
