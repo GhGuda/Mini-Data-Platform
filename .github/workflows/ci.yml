@@ -74,6 +74,11 @@ jobs:
           echo "Postgres did not become ready"
           exit 1
 
+      - name: Ensure sales schema exists
+        run: |
+          docker exec mini_postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -f /docker-entrypoint-initdb.d/01_schema.sql
+
       # ------------------------------------------------------------
       # Initialize Airflow Metadata
       # ------------------------------------------------------------
