@@ -11,85 +11,85 @@ on:
       - master
 
 jobs:
-  build-and-validate:
+  build-and-test:
     runs-on: ubuntu-latest
 
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_AIRFLOW_DB: ${{ secrets.POSTGRES_AIRFLOW_DB }}
+      AIRFLOW_EXECUTOR: ${{ secrets.AIRFLOW_EXECUTOR }}
+      AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
+      AIRFLOW_WEBSERVER_SECRET_KEY: ${{ secrets.AIRFLOW_WEBSERVER_SECRET_KEY }}
+      MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Create .env file for Docker
+      - name: Build Docker Images
         run: |
-          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> docker/.env
-          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> docker/.env
-          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> docker/.env
-          echo "POSTGRES_AIRFLOW_DB=${{ secrets.POSTGRES_AIRFLOW_DB }}" >> docker/.env
-          echo "AIRFLOW_EXECUTOR=${{ secrets.AIRFLOW_EXECUTOR }}" >> docker/.env
-          echo "AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY }}" >> docker/.env
-          echo "AIRFLOW_WEBSERVER_SECRET_KEY=${{ secrets.AIRFLOW_WEBSERVER_SECRET_KEY }}" >> docker/.env
-          echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}" >> docker/.env
-          echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}" >> docker/.env
+          docker compose -f docker/docker-compose.yml build
 
-      - name: Validate docker-compose file
+      # ------------------------------------------------------------
+      # 1️⃣ Start Infrastructure (Postgres + MinIO only)
+      # ------------------------------------------------------------
+      - name: Start Core Infrastructure
         run: |
-          docker compose -f docker/docker-compose.yml config
+          docker compose -f docker/docker-compose.yml up -d mini_postgres mini-minio
 
-      - name: Build Docker images
-        run: |
-          docker compose -f docker/docker-compose.yml build --no-cache
-
-      - name: Start services
-        run: |
-          docker compose -f docker/docker-compose.yml up -d
-
-      - name: Wait for Postgres to be healthy
+      - name: Wait for Postgres
         run: |
           for i in {1..20}; do
-            if docker exec mini_postgres pg_isready -U ${{ secrets.POSTGRES_USER }}; then
-              echo "Postgres is ready"
-              break
+            if docker exec mini_postgres pg_isready -U $POSTGRES_USER; then
+              echo "Postgres ready"
+              exit 0
             fi
             echo "Waiting for Postgres..."
             sleep 5
           done
+          echo "Postgres did not become ready"
+          exit 1
 
-      - name: Initialize Airflow DB
+      # ------------------------------------------------------------
+      # 2️⃣ Initialize Airflow Metadata
+      # ------------------------------------------------------------
+      - name: Initialize Airflow Metadata DB
         run: |
-          docker exec mini-airflow-web airflow db init
+          docker compose -f docker/docker-compose.yml run --rm airflow-webserver airflow db init
 
-      
-      - name: Restart Airflow Scheduler
+      # ------------------------------------------------------------
+      # 3️⃣ Start Airflow Services
+      # ------------------------------------------------------------
+      - name: Start Airflow Services
         run: |
-          docker restart mini-airflow-scheduler
-          sleep 20
+          docker compose -f docker/docker-compose.yml up -d airflow-scheduler airflow-webserver
 
-      - name: Show DAG import errors
-        run: |
-          docker exec mini-airflow-web airflow dags list-import-errors
+      - name: Wait for Scheduler Startup
+        run: sleep 30
 
-      - name: Verify dependencies inside Airflow
-        run: |
-          docker exec mini-airflow-web python -c "import minio, psycopg2, pandas; print('deps ok')"
-      
-      - name: Wait for Scheduler process
-        run: |
-          sleep 20
-      
-      - name: Debug DAG folder contents
-        run: |
-          docker exec mini-airflow-web ls -la /opt/airflow/dags
-
-      - name: Wait for DAG to appear in metadata DB
+      # ------------------------------------------------------------
+      # 4️⃣ Ensure DAG Registered in Metadata
+      # ------------------------------------------------------------
+      - name: Wait for DAG metadata registration
         run: |
           for i in {1..30}; do
-            if docker exec mini_postgres psql -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_AIRFLOW_DB }} -t -c "SELECT dag_id FROM dag WHERE dag_id='sales_etl_pipeline';" | grep -q sales_etl_pipeline; then
-              echo "DAG persisted in metadata DB"
-              break
+            if docker exec mini_postgres psql -U $POSTGRES_USER -d $POSTGRES_AIRFLOW_DB -t -c \
+              "SELECT dag_id FROM dag WHERE dag_id='sales_etl_pipeline';" | grep -q sales_etl_pipeline; then
+              echo "DAG metadata registered"
+              exit 0
             fi
             echo "Waiting for DAG metadata..."
             sleep 5
           done
+          echo "DAG not registered in metadata"
+          exit 1
 
+      # ------------------------------------------------------------
+      # 5️⃣ Create Test CSV
+      # ------------------------------------------------------------
       - name: Create test CSV inside Airflow container
         run: |
           docker exec mini-airflow-web bash -c 'cat <<EOF > /tmp/test_sales.csv
@@ -97,14 +97,17 @@ jobs:
           ORD001,CUST001,John Doe,john@example.com,Ghana,PROD001,2,50,100
           EOF'
 
-      - name: Create sales-raw bucket
+      # ------------------------------------------------------------
+      # 6️⃣ Ensure MinIO Bucket Exists
+      # ------------------------------------------------------------
+      - name: Ensure sales-raw bucket exists
         run: |
           docker exec mini-airflow-web python -c "
           from minio import Minio
           client = Minio(
               'mini-minio:9000',
-              access_key='${{ secrets.MINIO_ROOT_USER }}',
-              secret_key='${{ secrets.MINIO_ROOT_PASSWORD }}',
+              access_key='${MINIO_ROOT_USER}',
+              secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
           )
           if not client.bucket_exists('sales-raw'):
@@ -112,54 +115,47 @@ jobs:
           print('Bucket ready')
           "
 
-      
-      - name: Upload test CSV to sales-raw bucket
+      - name: Upload test CSV to MinIO
         run: |
           docker exec mini-airflow-web python -c "
           from minio import Minio
           client = Minio(
               'mini-minio:9000',
-              access_key='${{ secrets.MINIO_ROOT_USER }}',
-              secret_key='${{ secrets.MINIO_ROOT_PASSWORD }}',
+              access_key='${MINIO_ROOT_USER}',
+              secret_key='${MINIO_ROOT_PASSWORD}',
               secure=False
           )
           client.fput_object('sales-raw', 'ci_test.csv', '/tmp/test_sales.csv')
           print('Upload successful')
           "
 
+      # ------------------------------------------------------------
+      # 7️⃣ Trigger DAG
+      # ------------------------------------------------------------
       - name: Trigger ETL DAG
         run: |
           docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
 
-      - name: Wait for DAG execution
-        run: |
-          sleep 60
+      - name: Wait for DAG Execution
+        run: sleep 60
 
-      - name: Validate Airflow DAG import
+      # ------------------------------------------------------------
+      # 8️⃣ Validate Data Flow
+      # ------------------------------------------------------------
+      - name: Validate Data in sales_db
         run: |
-          docker exec mini-airflow-web airflow dags list
-    
-      - name: Wait for MinIO to be healthy
-        run: |
-          for i in {1..20}; do
-            if docker exec mini-minio curl -f http://localhost:9000/minio/health/live; then
-              echo "MinIO is ready"
-              break
-            fi
-            echo "Waiting for MinIO..."
-            sleep 5
-          done
-
-      - name: Validate data inserted into Postgres
-        run: |
-          docker exec mini_postgres psql -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }} -c "SELECT COUNT(*) FROM fact_sales;" > result.txt
-          cat result.txt
-          if ! grep -q "1" result.txt; then
-            echo "Data validation failed"
+          COUNT=$(docker exec mini_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c \
+            "SELECT COUNT(*) FROM fact_sales;")
+          echo "fact_sales count: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "ETL failed: No rows in fact_sales"
             exit 1
           fi
 
-      - name: Tear down containers
+      # ------------------------------------------------------------
+      # 9️⃣ Cleanup
+      # ------------------------------------------------------------
+      - name: Shutdown Containers
         if: always()
         run: |
           docker compose -f docker/docker-compose.yml down -v
