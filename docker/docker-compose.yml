@@ -73,7 +73,8 @@ services:
     restart: "no"
 
   airflow-webserver:
-    image: apache/airflow:2.8.1
+    build:
+      context: ../docker/airflow
     container_name: mini-airflow-web
     restart: unless-stopped
     depends_on:
@@ -99,7 +100,8 @@ services:
       - mini-data-network
 
   airflow-scheduler:
-    image: apache/airflow:2.8.1
+    build:
+      context: ../docker/airflow
     container_name: mini-airflow-scheduler
     restart: unless-stopped
     depends_on:
