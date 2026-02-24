@@ -290,29 +290,8 @@ jobs:
 
       - name: Create .env for Production Compose
         run: |
-          mkdir docker 2>nul
-
-          if "%POSTGRES_DB%"=="" set "POSTGRES_DB=sales_db"
-          if "%POSTGRES_AIRFLOW_DB%"=="" set "POSTGRES_AIRFLOW_DB=airflow_db"
-          if "%AIRFLOW_EXECUTOR%"=="" set "AIRFLOW_EXECUTOR=LocalExecutor"
-          if "%MINIO_BUCKET_RAW%"=="" set "MINIO_BUCKET_RAW=sales-raw"
-          if "%MINIO_BUCKET_PROCESSED%"=="" set "MINIO_BUCKET_PROCESSED=sales-processed"
-          if "%MINIO_ENDPOINT%"=="" set "MINIO_ENDPOINT=minio:9000"
-
-          echo POSTGRES_USER=%POSTGRES_USER%>docker\.env
-          echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%>>docker\.env
-          echo POSTGRES_DB=%POSTGRES_DB%>>docker\.env
-          echo POSTGRES_HOST=postgres>>docker\.env
-          echo POSTGRES_PORT=5432>>docker\.env
-          echo POSTGRES_AIRFLOW_DB=%POSTGRES_AIRFLOW_DB%>>docker\.env
-          echo AIRFLOW_EXECUTOR=%AIRFLOW_EXECUTOR%>>docker\.env
-          echo AIRFLOW_FERNET_KEY=%AIRFLOW_FERNET_KEY%>>docker\.env
-          echo AIRFLOW_WEBSERVER_SECRET_KEY=%AIRFLOW_WEBSERVER_SECRET_KEY%>>docker\.env
-          echo MINIO_ROOT_USER=%MINIO_ROOT_USER%>>docker\.env
-          echo MINIO_ROOT_PASSWORD=%MINIO_ROOT_PASSWORD%>>docker\.env
-          echo MINIO_BUCKET_RAW=%MINIO_BUCKET_RAW%>>docker\.env
-          echo MINIO_BUCKET_PROCESSED=%MINIO_BUCKET_PROCESSED%>>docker\.env
-          echo MINIO_ENDPOINT=%MINIO_ENDPOINT%>>docker\.env
+          set "PYCODE=import os,pathlib; p=pathlib.Path('docker'); p.mkdir(parents=True, exist_ok=True); vals={'POSTGRES_USER':os.getenv('POSTGRES_USER',''),'POSTGRES_PASSWORD':os.getenv('POSTGRES_PASSWORD',''),'POSTGRES_DB':os.getenv('POSTGRES_DB') or 'sales_db','POSTGRES_HOST':'postgres','POSTGRES_PORT':'5432','POSTGRES_AIRFLOW_DB':os.getenv('POSTGRES_AIRFLOW_DB') or 'airflow_db','AIRFLOW_EXECUTOR':os.getenv('AIRFLOW_EXECUTOR') or 'LocalExecutor','AIRFLOW_FERNET_KEY':os.getenv('AIRFLOW_FERNET_KEY',''),'AIRFLOW_WEBSERVER_SECRET_KEY':os.getenv('AIRFLOW_WEBSERVER_SECRET_KEY',''),'MINIO_ROOT_USER':os.getenv('MINIO_ROOT_USER',''),'MINIO_ROOT_PASSWORD':os.getenv('MINIO_ROOT_PASSWORD',''),'MINIO_BUCKET_RAW':os.getenv('MINIO_BUCKET_RAW') or 'sales-raw','MINIO_BUCKET_PROCESSED':os.getenv('MINIO_BUCKET_PROCESSED') or 'sales-processed','MINIO_ENDPOINT':os.getenv('MINIO_ENDPOINT') or 'minio:9000'}; (p/'.env').write_text(''.join(f'{k}={v}\\n' for k,v in vals.items()), encoding='utf-8')"
+          python -c "%PYCODE%" || py -3 -c "%PYCODE%"
 
       - name: Login to GHCR
         env:
