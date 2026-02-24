@@ -32,44 +32,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
       - name: Set Image Tag
         id: vars
         run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-
-      - name: Tag Images
-        run: |
-          TAG=${{ steps.vars.outputs.IMAGE_TAG }}
-
-          docker tag docker-airflow-webserver ghcr.io/ghguda/mini-data-platform/airflow-web:latest
-          docker tag docker-airflow-webserver ghcr.io/ghguda/mini-data-platform/airflow-web:$TAG
-
-          docker tag docker-airflow-scheduler ghcr.io/ghguda/mini-data-platform/airflow-scheduler:latest
-          docker tag docker-airflow-scheduler ghcr.io/ghguda/mini-data-platform/airflow-scheduler:$TAG
-
-          docker tag docker-storage-init ghcr.io/ghguda/mini-data-platform/storage-init:latest
-          docker tag docker-storage-init ghcr.io/ghguda/mini-data-platform/storage-init:$TAG
-
-          docker tag docker-data-generator ghcr.io/ghguda/mini-data-platform/data-generator:latest
-          docker tag docker-data-generator ghcr.io/ghguda/mini-data-platform/data-generator:$TAG
-
-      - name: Push Images
-        run: |
-          TAG=${{ steps.vars.outputs.IMAGE_TAG }}
-
-          docker push ghcr.io/ghguda/mini-data-platform/airflow-web:latest
-          docker push ghcr.io/ghguda/mini-data-platform/airflow-web:$TAG
-
-          docker push ghcr.io/ghguda/mini-data-platform/airflow-scheduler:latest
-          docker push ghcr.io/ghguda/mini-data-platform/airflow-scheduler:$TAG
-
-          docker push ghcr.io/ghguda/mini-data-platform/storage-init:latest
-          docker push ghcr.io/ghguda/mini-data-platform/storage-init:$TAG
-
-          docker push ghcr.io/ghguda/mini-data-platform/data-generator:latest
-          docker push ghcr.io/ghguda/mini-data-platform/data-generator:$TAG
 
       - name: Apply CI defaults
         run: |
@@ -244,6 +209,44 @@ jobs:
 
           echo "ETL failed: No rows in fact_sales after waiting."
           exit 1
+
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Tag Images
+        if: github.event_name == 'push'
+        run: |
+          TAG=${{ steps.vars.outputs.IMAGE_TAG }}
+
+          docker tag docker-airflow-webserver ghcr.io/ghguda/mini-data-platform/airflow-web:latest
+          docker tag docker-airflow-webserver ghcr.io/ghguda/mini-data-platform/airflow-web:$TAG
+
+          docker tag docker-airflow-scheduler ghcr.io/ghguda/mini-data-platform/airflow-scheduler:latest
+          docker tag docker-airflow-scheduler ghcr.io/ghguda/mini-data-platform/airflow-scheduler:$TAG
+
+          docker tag docker-storage-init ghcr.io/ghguda/mini-data-platform/storage-init:latest
+          docker tag docker-storage-init ghcr.io/ghguda/mini-data-platform/storage-init:$TAG
+
+          docker tag docker-data-generator ghcr.io/ghguda/mini-data-platform/data-generator:latest
+          docker tag docker-data-generator ghcr.io/ghguda/mini-data-platform/data-generator:$TAG
+
+      - name: Push Images
+        if: github.event_name == 'push'
+        run: |
+          TAG=${{ steps.vars.outputs.IMAGE_TAG }}
+
+          docker push ghcr.io/ghguda/mini-data-platform/airflow-web:latest
+          docker push ghcr.io/ghguda/mini-data-platform/airflow-web:$TAG
+
+          docker push ghcr.io/ghguda/mini-data-platform/airflow-scheduler:latest
+          docker push ghcr.io/ghguda/mini-data-platform/airflow-scheduler:$TAG
+
+          docker push ghcr.io/ghguda/mini-data-platform/storage-init:latest
+          docker push ghcr.io/ghguda/mini-data-platform/storage-init:$TAG
+
+          docker push ghcr.io/ghguda/mini-data-platform/data-generator:latest
+          docker push ghcr.io/ghguda/mini-data-platform/data-generator:$TAG
 
       # ------------------------------------------------------------
       # Cleanup
