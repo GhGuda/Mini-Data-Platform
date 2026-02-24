@@ -10,6 +10,10 @@ on:
       - working_from_home
       - master
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-test-CI:
     runs-on: ubuntu-latest
@@ -212,7 +216,10 @@ jobs:
 
       - name: Login to GHCR
         if: github.event_name == 'push'
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+        run: echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
       - name: Tag Images
         if: github.event_name == 'push'
@@ -257,13 +264,16 @@ jobs:
           docker compose -f docker/docker-compose.yml down -v
 
 
-  deploy:
+  deploy-CD:
     needs: build-and-test-CI
     runs-on: self-hosted
 
     steps:
       - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+        run: echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
       - name: Pull latest images
         run: docker compose -f docker/docker-compose.prod.yml pull
