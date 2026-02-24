@@ -272,6 +272,9 @@ jobs:
         shell: cmd
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Login to GHCR
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
