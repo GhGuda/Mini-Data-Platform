@@ -267,13 +267,16 @@ jobs:
   deploy-CD:
     needs: build-and-test-CI
     runs-on: self-hosted
+    defaults:
+      run:
+        shell: cmd
 
     steps:
       - name: Login to GHCR
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
-        run: echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+        run: echo %GHCR_TOKEN% | docker login ghcr.io -u %GHCR_USERNAME% --password-stdin
 
       - name: Pull latest images
         run: docker compose -f docker/docker-compose.prod.yml pull
