@@ -1,0 +1,67 @@
+services:
+
+  airflow-webserver:
+    image: ghcr.io/ghguda/mini-data-platform/airflow-web:latest
+    container_name: mini-airflow-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_AIRFLOW_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+      PYTHONPATH: /opt/airflow/dags
+    volumes:
+      - ../pipelines/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ../logs:/logs
+    ports:
+      - "8080:8080"
+    networks:
+      - mini-data-network
+
+
+  airflow-scheduler:
+    image: ghcr.io/ghguda/mini-data-platform/airflow-scheduler:latest
+    container_name: mini-airflow-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW_EXECUTOR}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_AIRFLOW_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      PYTHONPATH: /opt/airflow/dags
+    volumes:
+      - ../pipelines/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ../logs:/logs
+    networks:
+      - mini-data-network
+
+
+  storage-init:
+    image: ghcr.io/ghguda/mini-data-platform/storage-init:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - mini-data-network
+
+
+  data-generator:
+    image: ghcr.io/ghguda/mini-data-platform/data-generator:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - mini-data-network
+
+
+volumes:
+  airflow_logs:
+
+networks:
+  mini-data-network:
+    external: true
