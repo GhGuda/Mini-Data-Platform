@@ -24,6 +24,11 @@ default_args = {
     "depends_on_past": False,
     "retries": 3,
     "retry_delay": timedelta(minutes=2),
+    
+    #EMAIL ALERTING
+    "email": ["cenartech0@gmail.com"],
+    "email_on_failure": True,
+    "email_on_retry": False,
 }
 
 # ============================================================
@@ -90,12 +95,6 @@ with DAG(
                 f"Order lines: {len(normalized_data['order_lines'])}"
             )
 
-    def finalize(**context):
-        """
-        Placeholder final task.
-        """
-        pass
-
     list_task = PythonOperator(
         task_id="list_raw_files",
         python_callable=list_raw_files,
@@ -108,9 +107,7 @@ with DAG(
         provide_context=True,
     )
 
-    finalize_task = PythonOperator(
-        task_id="finalize",
-        python_callable=finalize,
-    )
-
-    list_task >> process_task >> finalize_task
+    # --------------------------------------------------
+    # DEPENDENCIES (clear & linear)
+    # --------------------------------------------------
+    list_task >> process_task

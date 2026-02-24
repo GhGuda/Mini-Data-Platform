@@ -1,0 +1,27 @@
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=change_me
+POSTGRES_DB=sales_db
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_AIRFLOW_DB=airflow_db
+
+AIRFLOW_EXECUTOR=LocalExecutor
+# Generate with:
+# docker run --rm apache/airflow:2.8.1 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+AIRFLOW_FERNET_KEY=replace_with_generated_fernet_key
+# Generate with:
+# python -c "import secrets; print(secrets.token_hex(32))"
+AIRFLOW_WEBSERVER_SECRET_KEY=replace_with_random_secret_key
+
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=change_me
+MINIO_BUCKET_RAW=sales-raw
+MINIO_BUCKET_PROCESSED=sales-processed
+MINIO_ENDPOINT=minio:9000
+
+METABASE_DB_FILE=/metabase-data/metabase.db
+
+# Data generator configuration
+GENERATOR_RECORD_COUNT=500
+GENERATOR_OUTPUT_DIR=/data/raw
+GENERATOR_TIMEOUT_SECONDS=60
