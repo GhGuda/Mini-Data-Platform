@@ -267,6 +267,19 @@ jobs:
   deploy-CD:
     needs: build-and-test-CI
     runs-on: self-hosted
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_AIRFLOW_DB: ${{ secrets.POSTGRES_AIRFLOW_DB }}
+      AIRFLOW_EXECUTOR: ${{ secrets.AIRFLOW_EXECUTOR }}
+      AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
+      AIRFLOW_WEBSERVER_SECRET_KEY: ${{ secrets.AIRFLOW_WEBSERVER_SECRET_KEY }}
+      MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+      MINIO_BUCKET_RAW: ${{ secrets.MINIO_BUCKET_RAW }}
+      MINIO_BUCKET_PROCESSED: ${{ secrets.MINIO_BUCKET_PROCESSED }}
+      MINIO_ENDPOINT: minio:9000
     defaults:
       run:
         shell: cmd
@@ -274,6 +287,34 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Create .env for Production Compose
+        run: |
+          if not exist docker mkdir docker
+
+          if "%POSTGRES_DB%"=="" set "POSTGRES_DB=sales_db"
+          if "%POSTGRES_AIRFLOW_DB%"=="" set "POSTGRES_AIRFLOW_DB=airflow_db"
+          if "%AIRFLOW_EXECUTOR%"=="" set "AIRFLOW_EXECUTOR=LocalExecutor"
+          if "%MINIO_BUCKET_RAW%"=="" set "MINIO_BUCKET_RAW=sales-raw"
+          if "%MINIO_BUCKET_PROCESSED%"=="" set "MINIO_BUCKET_PROCESSED=sales-processed"
+          if "%MINIO_ENDPOINT%"=="" set "MINIO_ENDPOINT=minio:9000"
+
+          (
+            echo POSTGRES_USER=%POSTGRES_USER%
+            echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%
+            echo POSTGRES_DB=%POSTGRES_DB%
+            echo POSTGRES_HOST=postgres
+            echo POSTGRES_PORT=5432
+            echo POSTGRES_AIRFLOW_DB=%POSTGRES_AIRFLOW_DB%
+            echo AIRFLOW_EXECUTOR=%AIRFLOW_EXECUTOR%
+            echo AIRFLOW_FERNET_KEY=%AIRFLOW_FERNET_KEY%
+            echo AIRFLOW_WEBSERVER_SECRET_KEY=%AIRFLOW_WEBSERVER_SECRET_KEY%
+            echo MINIO_ROOT_USER=%MINIO_ROOT_USER%
+            echo MINIO_ROOT_PASSWORD=%MINIO_ROOT_PASSWORD%
+            echo MINIO_BUCKET_RAW=%MINIO_BUCKET_RAW%
+            echo MINIO_BUCKET_PROCESSED=%MINIO_BUCKET_PROCESSED%
+            echo MINIO_ENDPOINT=%MINIO_ENDPOINT%
+          ) > docker\.env
 
       - name: Login to GHCR
         env:
