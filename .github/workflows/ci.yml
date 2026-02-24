@@ -302,5 +302,9 @@ jobs:
       - name: Pull latest images
         run: docker compose -f docker/docker-compose.prod.yml pull
 
+      - name: Ensure external network exists
+        run: |
+          docker network inspect mini-data-network >nul 2>&1 || docker network create mini-data-network
+
       - name: Restart containers
         run: docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
