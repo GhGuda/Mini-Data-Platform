@@ -32,3 +32,9 @@ Thumbs.db
 .env
 *.db
 *.sqlite3
+
+# If you have a storage directory for temporary files, you can ignore it as well
+storage/
+
+# Airflow configuration file (if you have one in the project directory)
+airflow.cfg
