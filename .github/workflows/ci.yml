@@ -290,7 +290,7 @@ jobs:
 
       - name: Create .env for Production Compose
         run: |
-          if not exist docker mkdir docker
+          mkdir docker 2>nul
 
           if "%POSTGRES_DB%"=="" set "POSTGRES_DB=sales_db"
           if "%POSTGRES_AIRFLOW_DB%"=="" set "POSTGRES_AIRFLOW_DB=airflow_db"
@@ -299,22 +299,20 @@ jobs:
           if "%MINIO_BUCKET_PROCESSED%"=="" set "MINIO_BUCKET_PROCESSED=sales-processed"
           if "%MINIO_ENDPOINT%"=="" set "MINIO_ENDPOINT=minio:9000"
 
-          (
-            echo POSTGRES_USER=%POSTGRES_USER%
-            echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%
-            echo POSTGRES_DB=%POSTGRES_DB%
-            echo POSTGRES_HOST=postgres
-            echo POSTGRES_PORT=5432
-            echo POSTGRES_AIRFLOW_DB=%POSTGRES_AIRFLOW_DB%
-            echo AIRFLOW_EXECUTOR=%AIRFLOW_EXECUTOR%
-            echo AIRFLOW_FERNET_KEY=%AIRFLOW_FERNET_KEY%
-            echo AIRFLOW_WEBSERVER_SECRET_KEY=%AIRFLOW_WEBSERVER_SECRET_KEY%
-            echo MINIO_ROOT_USER=%MINIO_ROOT_USER%
-            echo MINIO_ROOT_PASSWORD=%MINIO_ROOT_PASSWORD%
-            echo MINIO_BUCKET_RAW=%MINIO_BUCKET_RAW%
-            echo MINIO_BUCKET_PROCESSED=%MINIO_BUCKET_PROCESSED%
-            echo MINIO_ENDPOINT=%MINIO_ENDPOINT%
-          ) > docker\.env
+          echo POSTGRES_USER=%POSTGRES_USER%>docker\.env
+          echo POSTGRES_PASSWORD=%POSTGRES_PASSWORD%>>docker\.env
+          echo POSTGRES_DB=%POSTGRES_DB%>>docker\.env
+          echo POSTGRES_HOST=postgres>>docker\.env
+          echo POSTGRES_PORT=5432>>docker\.env
+          echo POSTGRES_AIRFLOW_DB=%POSTGRES_AIRFLOW_DB%>>docker\.env
+          echo AIRFLOW_EXECUTOR=%AIRFLOW_EXECUTOR%>>docker\.env
+          echo AIRFLOW_FERNET_KEY=%AIRFLOW_FERNET_KEY%>>docker\.env
+          echo AIRFLOW_WEBSERVER_SECRET_KEY=%AIRFLOW_WEBSERVER_SECRET_KEY%>>docker\.env
+          echo MINIO_ROOT_USER=%MINIO_ROOT_USER%>>docker\.env
+          echo MINIO_ROOT_PASSWORD=%MINIO_ROOT_PASSWORD%>>docker\.env
+          echo MINIO_BUCKET_RAW=%MINIO_BUCKET_RAW%>>docker\.env
+          echo MINIO_BUCKET_PROCESSED=%MINIO_BUCKET_PROCESSED%>>docker\.env
+          echo MINIO_ENDPOINT=%MINIO_ENDPOINT%>>docker\.env
 
       - name: Login to GHCR
         env:
