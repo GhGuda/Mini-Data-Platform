@@ -104,6 +104,31 @@ docker exec mini-airflow-web airflow dags trigger sales_etl_pipeline
 docker exec mini_postgres psql -U <POSTGRES_USER> -d <POSTGRES_DB> -c "SELECT COUNT(*) FROM fact_sales;"
 ```
 
+## End-to-End Test (MinIO -> Airflow -> PostgreSQL -> Metabase)
+Install test dependencies:
+```bash
+python -m pip install -r tests/requirements-test.txt
+```
+
+Run the data-flow e2e suite:
+```bash
+python -m pytest -m e2e tests/e2e/test_data_flow_e2e.py -vv
+```
+
+Default test endpoints assume local port mappings:
+- MinIO: `localhost:9000`
+- PostgreSQL: `localhost:5432`
+- Metabase: `http://localhost:3000`
+
+Optional overrides:
+- `TEST_MINIO_ENDPOINT`
+- `TEST_POSTGRES_HOST`
+- `TEST_POSTGRES_PORT`
+- `TEST_METABASE_URL`
+- `TEST_AIRFLOW_CONTAINER`
+- `TEST_METABASE_ADMIN_EMAIL`
+- `TEST_METABASE_ADMIN_PASSWORD`
+
 ## Production Deployment
 Production compose file: `docker/docker-compose.prod.yml`
 
