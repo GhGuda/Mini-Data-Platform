@@ -19,7 +19,7 @@ from minio.error import S3Error
 try:
     import psycopg
 except ImportError:  # pragma: no cover - fallback for older local environments
-    import psycopg2 as psycopg
+    import psycopg2 as psycopg # type: ignore[import]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
