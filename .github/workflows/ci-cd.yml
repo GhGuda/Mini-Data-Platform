@@ -266,7 +266,7 @@ jobs:
 
   deploy-CD:
     needs: build-and-test-CI
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows]
     env:
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -288,9 +288,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Verify Docker daemon availability
+        run: |
+          docker version >nul 2>&1 || (
+            echo Docker CLI cannot reach a running Docker daemon on this runner.
+            echo If this runner uses Docker Desktop, start Docker Desktop and keep the runner in the same logged-in Windows session.
+            echo If the runner runs as a Windows service, Docker Desktop named pipes are usually unavailable to that service account.
+            exit /b 1
+          )
+          docker info >nul 2>&1 || (
+            echo Docker daemon is still unavailable after invoking the Docker CLI.
+            exit /b 1
+          )
+
       - name: Create .env for Production Compose
         run: |
-          set "PYCODE=import os,pathlib; p=pathlib.Path('docker'); p.mkdir(parents=True, exist_ok=True); vals={'POSTGRES_USER':os.getenv('POSTGRES_USER',''),'POSTGRES_PASSWORD':os.getenv('POSTGRES_PASSWORD',''),'POSTGRES_DB':os.getenv('POSTGRES_DB') or 'sales_db','POSTGRES_HOST':'postgres','POSTGRES_PORT':'5432','POSTGRES_AIRFLOW_DB':os.getenv('POSTGRES_AIRFLOW_DB') or 'airflow_db','AIRFLOW_EXECUTOR':os.getenv('AIRFLOW_EXECUTOR') or 'LocalExecutor','AIRFLOW_FERNET_KEY':os.getenv('AIRFLOW_FERNET_KEY',''),'AIRFLOW_WEBSERVER_SECRET_KEY':os.getenv('AIRFLOW_WEBSERVER_SECRET_KEY',''),'MINIO_ROOT_USER':os.getenv('MINIO_ROOT_USER',''),'MINIO_ROOT_PASSWORD':os.getenv('MINIO_ROOT_PASSWORD',''),'MINIO_BUCKET_RAW':os.getenv('MINIO_BUCKET_RAW') or 'sales-raw','MINIO_BUCKET_PROCESSED':os.getenv('MINIO_BUCKET_PROCESSED') or 'sales-processed','MINIO_ENDPOINT':os.getenv('MINIO_ENDPOINT') or 'minio:9000'}; (p/'.env').write_text(''.join(f'{k}={v}\n' for k,v in vals.items()), encoding='utf-8')"
+          set "PYCODE=import os,pathlib; p=pathlib.Path('docker'); p.mkdir(parents=True, exist_ok=True); vals={'POSTGRES_USER':os.getenv('POSTGRES_USER',''),'POSTGRES_PASSWORD':os.getenv('POSTGRES_PASSWORD',''),'POSTGRES_DB':os.getenv('POSTGRES_DB') or 'sales_db','POSTGRES_HOST':'postgres','POSTGRES_PORT':'5432','POSTGRES_AIRFLOW_DB':os.getenv('POSTGRES_AIRFLOW_DB') or 'airflow_db','AIRFLOW_EXECUTOR':os.getenv('AIRFLOW_EXECUTOR') or 'LocalExecutor','AIRFLOW_FERNET_KEY':os.getenv('AIRFLOW_FERNET_KEY',''),'AIRFLOW_WEBSERVER_SECRET_KEY':os.getenv('AIRFLOW_WEBSERVER_SECRET_KEY',''),'SMTP_USER':os.getenv('SMTP_USER',''),'SMTP_PASSWORD':os.getenv('SMTP_PASSWORD',''),'MINIO_ROOT_USER':os.getenv('MINIO_ROOT_USER',''),'MINIO_ROOT_PASSWORD':os.getenv('MINIO_ROOT_PASSWORD',''),'MINIO_BUCKET_RAW':os.getenv('MINIO_BUCKET_RAW') or 'sales-raw','MINIO_BUCKET_PROCESSED':os.getenv('MINIO_BUCKET_PROCESSED') or 'sales-processed','MINIO_ENDPOINT':os.getenv('MINIO_ENDPOINT') or 'minio:9000'}; (p/'.env').write_text(''.join(f'{k}={v}\n' for k,v in vals.items()), encoding='utf-8')"
           python -c "%PYCODE%" || py -3 -c "%PYCODE%"
 
       - name: Login to GHCR
@@ -300,11 +313,11 @@ jobs:
         run: echo %GHCR_TOKEN% | docker login ghcr.io -u %GHCR_USERNAME% --password-stdin
 
       - name: Pull latest images
-        run: docker compose -f docker/docker-compose.prod.yml pull
+        run: docker compose --env-file docker/.env -f docker/docker-compose.prod.yml pull
 
       - name: Ensure external network exists
         run: |
           docker network inspect mini-data-network >nul 2>&1 || docker network create mini-data-network
 
       - name: Restart containers
-        run: docker compose -f docker/docker-compose.prod.yml up -d --remove-orphans
+        run: docker compose --env-file docker/.env -f docker/docker-compose.prod.yml up -d --remove-orphans
